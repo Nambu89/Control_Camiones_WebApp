@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- 
+        Declaración de tipo de documento HTML5 y metaetiquetas estándar.
+        La meta viewport es importante para el diseño responsivo, asegurando que la página se muestre correctamente en pantallas móviles.
+    -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- 
+        Título dinámico: se usa un block title para que las páginas que extienden este template puedan definir su propio título.
+    -->
+    <title>{% block title %}Control Logístico{% endblock %}</title>
+
+    <!-- 
+        Link a la hoja de estilos de Bootstrap (CDN).
+        Esto facilita un diseño limpio y responsivo.
+    -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+</head>
+<body>
+    <!-- 
+        Barra de navegación con Bootstrap:
+        - "navbar" clase base
+        - "navbar-expand-lg" para expandirse en pantallas grandes
+        - "navbar-light bg-light" para colores claros
+    -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+        <div class="container-fluid">
+            <!-- 
+                Logo o nombre de la empresa: usando url_for('index') 
+                nos lleva a la ruta principal 
+            -->
+            <a class="navbar-brand" href="{{ url_for('index') }}">Logística</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+                <!-- Icono del botón toggle en móvil -->
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <!-- 
+                Contenedor del menú colapsable.
+                Dentro colocamos enlaces a distintas secciones:
+                - Inicio: vuelve a la página principal
+                - Buscar: va a la página de búsqueda
+                - Lista: muestra todos los camiones que están actualmente dentro sin registrar salida
+            -->
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">Inicio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('search') }}">Buscar</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('list_camiones') }}">Lista</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{url_for('report') }}">Reporte</a>
+                    </li>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 
+        Contenedor principal para el contenido.
+        El "block content" será reemplazado por las plantillas hijas (index.html, search.html, list.html).
+    -->
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- 
+        Scripts de Bootstrap para que la barra de navegación y otros componentes funcionen.
+        Incluimos el bundle completo que contiene Popper y Bootstrap JS.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Bloque para inyectar scripts desde plantillas hijas -->
+     {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Control de Entradas/Salidas{% endblock %}
+
+{% block content %}
+<!--
+    Este es el contenido de la página principal.
+    Aquí se muestra un formulario para ingresar las matrículas y la empresa del camión.
+    El comportamiento:
+    - Si el camión no está dentro, el botón dice "Registrar entrada".
+    - Si el camión ya entró y no salió, el botón dice "Registrar salida".
+    
+    También se muestra la información del último registro del camión buscado.
+-->
+
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <!-- Título principal de la página -->
+        <h1 class="mb-4">Control de Camiones</h1>
+
+        <!-- 
+            Formulario:
+            - method="post" envía los datos al servidor cuando se hace submit
+            - Campos: matrículas (tractora y remolque), empresa, almacén, tipo
+            - Botón depende del estado (entrada/salida)
+        -->
+        <form method="post" class="border p-4 rounded">
+            <!-- Campo para matrícula de la tractora -->
+            <div class="mb-3">
+                <label for="matricula_tractora" class="form-label">Matrícula de la tractora</label>
+                <!-- 
+                    "value={{ matricula_tractora }}" sirve para conservar el valor si venimos de una búsqueda o refresco.
+                    required hace que el campo sea obligatorio.
+                -->
+                <input type="text" class="form-control" id="matricula_tractora" name="matricula_tractora" 
+                       value="{{ matricula_tractora }}" required>
+            </div>
+            
+            <!-- Campo para matrícula del remolque -->
+            <div class="mb-3">
+                <label for="matricula_remolque" class="form-label">Matrícula del remolque</label>
+                <!-- 
+                    Este campo no es required ya que podría no tener remolque.
+                -->
+                <input type="text" class="form-control" id="matricula_remolque" name="matricula_remolque" 
+                       value="{{ matricula_remolque }}">
+            </div>
+            
+            <!-- Campo para la empresa -->
+            <div class="mb-3">
+                <label for="empresa" class="form-label">Empresa del transportista</label>
+                <!-- 
+                    Igualmente ponemos value="{{ empresa }}" para no perder el valor al actualizar la página.
+                -->
+                <input type="text" class="form-control" id="empresa" name="empresa" 
+                       value="{{ empresa }}" required>
+            </div>
+
+            <!-- Campo Número de envío-->
+            <div class="mb-3">
+                <label for="numero_envio" class="form-label">Número de envío</label>
+                <input type="text" class="form-control" id="numero_envio" name="numero_envio" value="{{ numero_envio }}">
+            </div>
+            
+            <!-- NUEVO: Campo para el almacén (S1/S6) -->
+            <div class="mb-3">
+                <label for="almacen" class="form-label">Almacén</label>
+                <select class="form-select" id="almacen" name="almacen" required>
+                    <option value="" {% if not almacen %}selected{% endif %}>Seleccione...</option>
+                    <option value="S1" {% if almacen == 'S1' %}selected{% endif %}>S1</option>
+                    <option value="S6" {% if almacen == 'S6' %}selected{% endif %}>S6</option>
+                </select>
+            </div>
+            
+            <!-- NUEVO: Campo para el tipo (Carga/Descarga) -->
+            <div class="mb-3">
+                <label for="tipo" class="form-label">Tipo</label>
+                <select class="form-select" id="tipo" name="tipo" required>
+                    <option value="" {% if not tipo %}selected{% endif %}>Seleccione...</option>
+                    <option value="Carga" {% if tipo == 'Carga' %}selected{% endif %}>Carga</option>
+                    <option value="Descarga" {% if tipo == 'Descarga' %}selected{% endif %}>Descarga</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <!-- 
+                    Dependiendo del estado del camión, mostramos un botón u otro.
+                    - Si no hay entrada activa o ya ha salido, mostramos "Registrar entrada"
+                    - Si el camión tiene una entrada sin salida, mostramos "Registrar salida"
+                -->
+                {% if not entrada_registrada or salida_registrada %}
+                    <button type="submit" class="btn btn-success">Registrar entrada</button>
+                {% else %}
+                    <button type="submit" class="btn btn-danger">Registrar salida</button>
+                {% endif %}
+            </div>
+        </form>
+
+        <!-- 
+            Si se ha introducido una matrícula de tractora y tenemos información del camión, 
+            la mostramos aquí. Esto brinda retroalimentación visual al usuario.
+        -->
+        {% if matricula_tractora and fecha_entrada %}
+            <div class="mt-4 p-4 bg-light border rounded">
+                <h3>Información del camión</h3>
+                <p><strong>Matrícula tractora:</strong> {{ matricula_tractora }}</p>
+                <p><strong>Matrícula remolque:</strong> {{ matricula_remolque }}</p>
+                <p><strong>Empresa:</strong> {{ empresa }}</p>
+                <p><strong>Número envío:</strong> {{ numero_envio }}</p>
+                <p><strong>Almacén:</strong> {{ almacen }}</p>
+                <p><strong>Tipo:</strong> {{ tipo }}</p>
+                <p><strong>Fecha/Hora de Entrada:</strong> {{ fecha_entrada }}</p>
+                {% if fecha_salida %}
+                    <p><strong>Fecha/Hora de Salida:</strong> {{ fecha_salida }}</p>
+                {% else %}
+                    <p><em>Aún dentro de las instalaciones</em></p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

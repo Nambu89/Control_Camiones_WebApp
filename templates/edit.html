@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Camión{% endblock %}
+
+{% block content %}
+<h1>Editar Camión</h1>
+<form method="post" class="border p-4 rounded">
+    <div class="mb-3">
+        <label for="matricula_tractora" class="form-label">Matrícula Tractora:</label>
+        <input type="text" class="form-control" id="matricula_tractora" name="matricula_tractora" value="{{ matricula_tractora }}" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="matricula_remolque" class="form-label">Matrícula Remolque:</label>
+        <input type="text" class="form-control" id="matricula_remolque" name="matricula_remolque" value="{{ matricula_remolque }}">
+    </div>
+    
+    <div class="mb-3">
+        <label for="empresa" class="form-label">Empresa:</label>
+        <input type="text" class="form-control" id="empresa" name="empresa" value="{{ empresa }}" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="numero_envio" class="form-label">Número de envío:</label>
+        <input type="text" class="form-control" id="numero_envio" name="numero_envio" value="{{ numero_envio }}">
+    </div>
+    
+    <div class="mb-3">
+        <label for="almacen" class="form-label">Almacén:</label>
+        <select class="form-select" id="almacen" name="almacen" required>
+            <option value="" {% if not almacen %}selected{% endif %}>Seleccione...</option>
+            <option value="S1" {% if almacen == 'S1' %}selected{% endif %}>S1</option>
+            <option value="S6" {% if almacen == 'S6' %}selected{% endif %}>S6</option>
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="tipo" class="form-label">Tipo:</label>
+        <select class="form-select" id="tipo" name="tipo" required>
+            <option value="" {% if not tipo %}selected{% endif %}>Seleccione...</option>
+            <option value="Carga" {% if tipo == 'Carga' %}selected{% endif %}>Carga</option>
+            <option value="Descarga" {% if tipo == 'Descarga' %}selected{% endif %}>Descarga</option>
+        </select>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Guardar</button>
+</form>
+{% endblock %}

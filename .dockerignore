@@ -1,0 +1,43 @@
+# Entorno virtual
+venv/
+env/
+.env/
+
+# Git
+.git/
+.gitignore
+
+# Base de datos y backups
+*.db
+database.db
+backups/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.py[cod]
+*$py.class
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+log/
+logs/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Otros
+*.swp
+*.swo
+*~
