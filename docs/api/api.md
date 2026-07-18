@@ -23,6 +23,16 @@ El Sistema de Control Logístico de Camiones está implementado como una aplicac
   - `almacen`: Identificador del almacén (S1 o S6)
   - `tipo`: Tipo de operación (Carga o Descarga)
 
+### Health Check
+
+- **Ruta**: `/health`
+- **Métodos**: `GET`
+- **Función**: `health()`
+- **Descripción**: Verifica que la aplicación arranca correctamente y que la base de datos responde.
+- **Comportamiento**:
+  - `GET`: Devuelve JSON con el estado general, estado de base de datos, marca temporal y zona horaria configurada.
+  - Si la base de datos no responde, devuelve `503 Service Unavailable`.
+
 ### Listado de Camiones Activos
 
 - **Ruta**: `/list`
@@ -149,6 +159,7 @@ El Sistema de Control Logístico de Camiones está implementado como una aplicac
 
 - No se implementa autenticación ni autorización en la versión actual
 - Las consultas SQL utilizan parámetros para prevenir inyección SQL
+- La aplicación añade cabeceras HTTP defensivas en todas las respuestas
 - No se implementa protección CSRF en los formularios
 
 ## Extensión de la API

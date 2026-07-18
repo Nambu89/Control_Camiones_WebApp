@@ -44,6 +44,12 @@ El despliegue con Docker es la opción recomendada, ya que proporciona un entorn
    http://[dirección-ip-del-servidor]:5000
    ```
 
+   Y valide el endpoint operativo:
+
+   ```bash
+   curl http://[dirección-ip-del-servidor]:5000/health
+   ```
+
 #### Persistencia de Datos
 
 Por defecto, la base de datos SQLite se almacena dentro del contenedor. Para mantener los datos persistentes entre reinicios, se recomienda montar un volumen y configurar la ruta mediante la variable de entorno `DATABASE_PATH`:
@@ -156,6 +162,7 @@ La aplicación es compatible con **Azure App Service for Containers** y **Azure 
 4. **Configurar variables de entorno** en el Portal de Azure → Configuration → Application settings:
    - `DATABASE_PATH` → `/home/data/database.db` (montar Azure Files para persistencia)
    - `APP_TIMEZONE` → su zona horaria
+   - `LOG_LEVEL` → `INFO`
    - `PORT` → `5000`
 
 #### Azure Container Apps
@@ -176,6 +183,15 @@ az containerapp create \
 - **Microsoft Entra ID**: añadir autenticación mediante `MSAL` (Microsoft Authentication Library) y proteger rutas con `@login_required`.
 - **Application Insights**: añadir `opentelemetry-instrumentation-flask` para telemetría de peticiones, logs y seguimiento de errores.
 
+## Postura recomendada para un MVP en Azure
+
+Mientras la aplicación siga sin autenticación corporativa, la forma más defendible de desplegarla es limitar su exposición:
+
+1. Mantenerla detrás de una red corporativa, VPN o restricciones de acceso por IP.
+2. Persistir SQLite en un volumen montado y tratar la base de datos como un componente de piloto, no como plataforma multiusuario de gran escala.
+3. Mantener `FLASK_DEBUG=0` en producción y revisar el `LOG_LEVEL` antes de abrir el acceso.
+4. Usar `/health` como sonda de disponibilidad y preparar el salto a Application Insights cuando el MVP pase a operación sostenida.
+
 ## Configuración Post-Despliegue
 
 ### Zona Horaria
@@ -191,7 +207,7 @@ export APP_TIMEZONE=America/Mexico_City
 python app.py
 ```
 
-O copiando `.env.example` a `.env` y ajustando el valor. Ver [lista de zonas horarias IANA](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+O copiando `.env.example` a `.env` y ajustando el valor. La aplicación carga ese archivo automáticamente al arrancar. Ver [lista de zonas horarias IANA](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 
 ### Respaldo de la Base de Datos
 

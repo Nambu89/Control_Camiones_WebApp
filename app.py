@@ -1,10 +1,29 @@
-from flask import Flask, render_template, request, redirect, url_for, Response
+import csv
+import logging
+import os
 import sqlite3
 from datetime import datetime
-from pytz import timezone
-import csv
 from io import StringIO
-import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+from flask import Flask, Response, jsonify, redirect, render_template, request, url_for
+from pytz import UnknownTimeZoneError, timezone
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / '.env')
+
+
+def resolve_log_level():
+    level_name = os.environ.get('LOG_LEVEL', 'INFO').upper()
+    return getattr(logging, level_name, logging.INFO)
+
+
+logging.basicConfig(
+    level=resolve_log_level(),
+    format='%(asctime)s %(levelname)s %(name)s %(message)s',
+)
+logger = logging.getLogger('truck_control')
 
 app = Flask(__name__)
 
@@ -14,12 +33,31 @@ app = Flask(__name__)
 # ---------------------------------------------------------------------------
 DATABASE_PATH = os.environ.get('DATABASE_PATH', 'database.db')
 TIMEZONE_NAME = os.environ.get('APP_TIMEZONE', 'Europe/Madrid')
-TIMEZONE = timezone(TIMEZONE_NAME)
+try:
+    TIMEZONE = timezone(TIMEZONE_NAME)
+except UnknownTimeZoneError:
+    logger.warning("Invalid APP_TIMEZONE '%s'. Falling back to Europe/Madrid.", TIMEZONE_NAME)
+    TIMEZONE_NAME = 'Europe/Madrid'
+    TIMEZONE = timezone(TIMEZONE_NAME)
 DEBUG = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
 PORT = int(os.environ.get('PORT', '5000'))
+MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', '262144'))
+
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+
+
+def ensure_database_directory():
+    database_file = Path(DATABASE_PATH).expanduser()
+    if database_file.parent != Path('.'):
+        database_file.parent.mkdir(parents=True, exist_ok=True)
+
+
+def get_db_connection():
+    ensure_database_directory()
+    return sqlite3.connect(DATABASE_PATH, timeout=5)
 
 def init_db():
-    with sqlite3.connect(DATABASE_PATH) as conn:
+    with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('''
             CREATE TABLE IF NOT EXISTS camiones(
@@ -34,25 +72,72 @@ def init_db():
                 tipo TEXT
             )
         ''')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_camiones_matricula_tractora ON camiones(matricula_tractora)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_camiones_fecha_entrada ON camiones(fecha_entrada)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_camiones_fecha_salida ON camiones(fecha_salida)')
         conn.commit()
 
 init_db()
+logger.info('Application initialized with database path %s', DATABASE_PATH)
+
+
+def normalize_text(value):
+    return value.strip() if value else ''
 
 def get_current_datetime():
-    """Obtiene la fecha y hora actual en la zona horaria de España"""
+    """Obtiene la fecha y hora actual en la zona horaria configurada."""
     return datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')
+
+
+def parse_report_date(date_value):
+    return datetime.strptime(date_value, '%d-%m-%Y').strftime('%Y-%m-%d')
+
+
+def database_is_healthy():
+    with get_db_connection() as conn:
+        conn.execute('SELECT 1')
+        conn.execute('SELECT 1 FROM camiones LIMIT 1')
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    try:
+        database_is_healthy()
+    except sqlite3.Error:
+        logger.exception('Health check failed')
+        return jsonify({
+            'status': 'error',
+            'database': 'unavailable',
+            'timestamp': get_current_datetime(),
+            'timezone': TIMEZONE_NAME,
+        }), 503
+
+    return jsonify({
+        'status': 'ok',
+        'database': 'ok',
+        'timestamp': get_current_datetime(),
+        'timezone': TIMEZONE_NAME,
+    })
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        matricula_tractora = request.form.get('matricula_tractora')
-        matricula_remolque = request.form.get('matricula_remolque', '')
-        empresa = request.form.get('empresa')
-        numero_envio = request.form.get('numero_envio', '')
-        almacen = request.form.get('almacen')  # Nuevo campo
-        tipo = request.form.get('tipo')  # Nuevo campo
+        matricula_tractora = normalize_text(request.form.get('matricula_tractora'))
+        matricula_remolque = normalize_text(request.form.get('matricula_remolque', ''))
+        empresa = normalize_text(request.form.get('empresa'))
+        numero_envio = normalize_text(request.form.get('numero_envio', ''))
+        almacen = normalize_text(request.form.get('almacen'))
+        tipo = normalize_text(request.form.get('tipo'))
 
-        with sqlite3.connect(DATABASE_PATH) as conn:
+        with get_db_connection() as conn:
             c = conn.cursor()
             c.execute('SELECT id, fecha_entrada, fecha_salida FROM camiones WHERE matricula_tractora = ? ORDER BY id DESC LIMIT 1',
                      (matricula_tractora,))
@@ -61,7 +146,7 @@ def index():
         if not row or (row and row[2] is not None):
             # Registrar entrada
             fecha_entrada = get_current_datetime()
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with get_db_connection() as conn:
                 c = conn.cursor()
                 c.execute('''
                     INSERT INTO camiones 
@@ -74,7 +159,7 @@ def index():
             # Registrar salida
             cam_id = row[0]
             fecha_salida = get_current_datetime()
-            with sqlite3.connect(DATABASE_PATH) as conn:
+            with get_db_connection() as conn:
                 c = conn.cursor()
                 c.execute('UPDATE camiones SET fecha_salida = ? WHERE id = ?', (fecha_salida, cam_id))
                 conn.commit()
@@ -92,7 +177,7 @@ def index():
     tipo = ''
 
     if matricula_tractora:
-        with sqlite3.connect(DATABASE_PATH) as conn:
+        with get_db_connection() as conn:
             c = conn.cursor()
             c.execute('''
                 SELECT id, empresa, matricula_remolque, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
@@ -130,7 +215,7 @@ def index():
 def list_camiones():
     almacen_filter = request.args.get('almacen', '')
     
-    with sqlite3.connect(DATABASE_PATH) as conn:
+    with get_db_connection() as conn:
         c = conn.cursor()
         
         if almacen_filter:
@@ -154,7 +239,7 @@ def list_camiones():
 def registrar_salida(camion_id):
     fecha_salida = get_current_datetime()
 
-    with sqlite3.connect(DATABASE_PATH) as conn:
+    with get_db_connection() as conn:
         c = conn.cursor()
         # Primero obtenemos matricula_tractora y fecha_entrada de este camion_id
         c.execute('SELECT matricula_tractora, fecha_entrada FROM camiones WHERE id=?', (camion_id,))
@@ -178,7 +263,7 @@ def registrar_salida(camion_id):
 
 @app.route('/replicate/<int:camion_id>', methods=['POST'])
 def replicate_camion(camion_id):
-    with sqlite3.connect(DATABASE_PATH) as conn:
+    with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('''
             SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, numero_envio, almacen, tipo 
@@ -207,7 +292,7 @@ def replicate_camion(camion_id):
 
 @app.route('/delete/<int:camion_id>', methods=['POST'])
 def delete_camion(camion_id):
-    with sqlite3.connect(DATABASE_PATH) as conn:
+    with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('DELETE FROM camiones WHERE id = ?', (camion_id,))
         conn.commit()
@@ -218,8 +303,8 @@ def search():
     resultados = []
     query = ''
     if request.method == 'POST':
-        query = request.form.get('query', '').strip()
-        with sqlite3.connect(DATABASE_PATH) as conn:
+        query = normalize_text(request.form.get('query', ''))
+        with get_db_connection() as conn:
             c = conn.cursor()
             c.execute("""
                 SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
@@ -240,52 +325,50 @@ def report():
     end_date = ''
 
     if request.method == 'POST':
-        start_date = request.form.get('start_date', '').strip()
-        end_date = request.form.get('end_date', '').strip()
-
-        def convert_date_format(d):
-            day, month, year = d.split('-')
-            return f"{year}-{month}-{day}"
+        start_date = normalize_text(request.form.get('start_date', ''))
+        end_date = normalize_text(request.form.get('end_date', ''))
 
         if start_date and end_date:
-            start_date_iso = convert_date_format(start_date)
-            end_date_iso = convert_date_format(end_date)
+            try:
+                start_date_iso = parse_report_date(start_date)
+                end_date_iso = parse_report_date(end_date)
+            except ValueError:
+                logger.warning('Invalid report date range: start=%s end=%s', start_date, end_date)
+            else:
+                with get_db_connection() as conn:
+                    c = conn.cursor()
+                    c.execute('''
+                        SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
+                        FROM camiones
+                        WHERE fecha_entrada BETWEEN ? AND ?
+                        ORDER BY fecha_entrada ASC
+                    ''', (start_date_iso + ' 00:00:00', end_date_iso + ' 23:59:59'))
+                    resultados = c.fetchall()
 
-            with sqlite3.connect(DATABASE_PATH) as conn:
+    return render_template('report.html', resultados=resultados, start_date=start_date, end_date=end_date)
+
+@app.route('/export.csv', methods=['GET'])
+def export_csv():
+    start_date = normalize_text(request.args.get('start_date', ''))
+    end_date = normalize_text(request.args.get('end_date', ''))
+    results = []
+
+    if start_date and end_date:
+        try:
+            start_date_iso = parse_report_date(start_date)
+            end_date_iso = parse_report_date(end_date)
+        except ValueError:
+            logger.warning('Invalid export date range: start=%s end=%s', start_date, end_date)
+        else:
+            with get_db_connection() as conn:
                 c = conn.cursor()
                 c.execute('''
                     SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
                     FROM camiones
                     WHERE fecha_entrada BETWEEN ? AND ?
                     ORDER BY fecha_entrada ASC
-                ''', (start_date_iso + " 00:00:00", end_date_iso + " 23:59:59"))
-                resultados = c.fetchall()
-
-    return render_template('report.html', resultados=resultados, start_date=start_date, end_date=end_date)
-
-@app.route('/export.csv', methods=['GET'])
-def export_csv():
-    start_date = request.args.get('start_date', '')
-    end_date = request.args.get('end_date', '')
-    results = []
-
-    def convert_date_format(d):
-        day, month, year = d.split('-')
-        return f"{year}-{month}-{day}"
-
-    if start_date and end_date:
-        start_date_iso = convert_date_format(start_date)
-        end_date_iso = convert_date_format(end_date)
-
-        with sqlite3.connect(DATABASE_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
-                SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
-                FROM camiones
-                WHERE fecha_entrada BETWEEN ? AND ?
-                ORDER BY fecha_entrada ASC
-            ''', (start_date_iso + " 00:00:00", end_date_iso + " 23:59:59"))
-            results = c.fetchall()
+                ''', (start_date_iso + ' 00:00:00', end_date_iso + ' 23:59:59'))
+                results = c.fetchall()
 
     output = StringIO()
     writer = csv.writer(output, delimiter=',')
@@ -307,14 +390,14 @@ def export_csv():
 def edit_camion(camion_id):
     if request.method == 'POST':
         # Ahora recogemos todos los campos
-        matricula_tractora = request.form.get('matricula_tractora', '')
-        matricula_remolque = request.form.get('matricula_remolque', '')
-        empresa = request.form.get('empresa', '')
-        numero_envio = request.form.get('numero_envio', '')
-        almacen = request.form.get('almacen', '')
-        tipo = request.form.get('tipo', '')
+        matricula_tractora = normalize_text(request.form.get('matricula_tractora', ''))
+        matricula_remolque = normalize_text(request.form.get('matricula_remolque', ''))
+        empresa = normalize_text(request.form.get('empresa', ''))
+        numero_envio = normalize_text(request.form.get('numero_envio', ''))
+        almacen = normalize_text(request.form.get('almacen', ''))
+        tipo = normalize_text(request.form.get('tipo', ''))
         
-        with sqlite3.connect(DATABASE_PATH) as conn:
+        with get_db_connection() as conn:
             c = conn.cursor()
             c.execute('''
                 UPDATE camiones 
@@ -329,7 +412,7 @@ def edit_camion(camion_id):
             conn.commit()
         return redirect(url_for('list_camiones'))
     else:
-        with sqlite3.connect(DATABASE_PATH) as conn:
+        with get_db_connection() as conn:
             c = conn.cursor()
             c.execute('SELECT matricula_tractora, matricula_remolque, empresa, numero_envio, almacen, tipo FROM camiones WHERE id = ?', (camion_id,))
             row = c.fetchone()
@@ -348,4 +431,4 @@ def edit_camion(camion_id):
                              tipo=tipo)
 
 if __name__ == '__main__':
-    app.run(debug=DEBUG, port=PORT)
+    app.run(host='127.0.0.1', debug=DEBUG, port=PORT)

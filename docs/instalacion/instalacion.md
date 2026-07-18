@@ -51,6 +51,8 @@ pip install -r requirements.txt
 
 La aplicación inicializará automáticamente la base de datos SQLite al arrancar por primera vez. No se requieren pasos adicionales.
 
+Si desea personalizar la configuración local, copie `.env.example` a `.env`. La aplicación lo cargará automáticamente al iniciar.
+
 ### 5. Ejecutar la Aplicación en Modo Desarrollo
 
 Para iniciar la aplicación en modo desarrollo:
@@ -104,6 +106,13 @@ python app.py
 
 O copiando `.env.example` a `.env` y ajustando el valor. Ver [lista de zonas horarias IANA](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 
+### Logs y tamaño máximo de petición
+
+También puede ajustar estas variables opcionales:
+
+- `LOG_LEVEL` para controlar la verbosidad de logs
+- `MAX_CONTENT_LENGTH` para limitar el tamaño máximo de las peticiones HTTP
+
 ### Personalización de Almacenes
 
 Los almacenes disponibles (S1 y S6) están definidos en los formularios HTML. Si necesita modificar estas opciones, edite los archivos:
@@ -129,15 +138,28 @@ pip install -r requirements.txt --force-reinstall
 
 ### Problemas de Puerto
 
-Si el puerto 5000 ya está en uso, puede cambiar el puerto en el archivo `app.py`:
+Si el puerto 5000 ya está en uso, puede cambiarlo mediante la variable de entorno `PORT`:
 
-```python
-if __name__ == '__main__':
-    app.run(debug=True, port=5001)  # Cambie 5001 por el puerto deseado
+```bash
+# Linux/macOS
+export PORT=5001
+python app.py
+
+# Windows PowerShell
+$env:PORT="5001"
+python app.py
 ```
 
 O al ejecutar el contenedor Docker:
 
 ```bash
 docker run -p 8080:5000 control-camiones  # Mapea el puerto 8080 del host al 5000 del contenedor
+```
+
+### Comprobación de salud
+
+Una vez arrancada la aplicación, puede validar el estado básico con:
+
+```bash
+curl http://localhost:5000/health
 ```

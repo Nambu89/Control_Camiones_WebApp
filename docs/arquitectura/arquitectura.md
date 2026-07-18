@@ -31,9 +31,11 @@ El Sistema de Control Logístico de Camiones sigue una arquitectura de aplicaci�
 - **Framework**: Flask (Python)
 - **Estructura**:
   - Rutas (routes) para gestionar las peticiones HTTP
+  - Carga explícita de configuración desde `.env` y variables de entorno
   - Funciones para el procesamiento de datos
   - Lógica de negocio para el registro de entradas/salidas
   - Generación de reportes y exportación de datos
+  - Endpoint `/health` para verificación operativa del servicio
 
 ### 3. Base de Datos
 
@@ -42,6 +44,7 @@ El Sistema de Control Logístico de Camiones sigue una arquitectura de aplicaci�
   - Tabla principal `camiones` para almacenar todos los registros
   - Campos para almacenar información de matrículas, empresas, fechas, etc.
   - Consultas SQL para recuperar y manipular datos
+  - Índices básicos sobre matrícula y fechas para sostener el rendimiento del MVP
 
 ## Flujo de Datos
 
@@ -71,6 +74,7 @@ El Sistema de Control Logístico de Camiones sigue una arquitectura de aplicaci�
 - **Seguridad**:
   - Validación de datos de entrada en el servidor
   - Protección contra inyección SQL mediante parámetros en consultas
+  - Cabeceras HTTP defensivas (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`)
   - No se implementa autenticación de usuarios en la versión actual
 
 - **Rendimiento**:
@@ -86,3 +90,15 @@ La arquitectura actual es adecuada para instalaciones individuales con volumen m
 - Implementar un sistema de autenticación y autorización
 - Añadir paginación para grandes volúmenes de datos
 - Considerar una arquitectura de microservicios para funcionalidades específicas
+
+## Postura MVP para Azure
+
+El diseño actual sigue siendo monolítico y deliberadamente simple, pero ya incorpora varias medidas que lo hacen más defendible como MVP en Azure:
+
+- configuración desacoplada por entorno
+- endpoint operativo `/health`
+- logs por salida estándar
+- contenedor sin privilegios
+- persistencia configurable para SQLite
+
+La recomendación concreta para esta fase es desplegarlo como contenedor, mantener el acceso restringido a usuarios internos o sedes controladas y posponer una autenticación corporativa completa hasta validar el uso real del producto.

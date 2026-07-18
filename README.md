@@ -19,8 +19,9 @@ Truck Control Web App is a Flask-based web application that registers and contro
 - Search by tractor plate, trailer plate, company, or shipment number
 - Date-range reports with CSV export
 - Filter by warehouse location and operation type (loading/unloading)
-- Configurable timezone and database path via environment variables
-- Docker-ready with non-root user and health check
+- Explicit `.env` loading plus configurable timezone and database path via environment variables
+- Real `/health` endpoint for container probes and Azure readiness checks
+- Docker-ready with non-root user, basic security headers, and startup logging
 
 ### Tech Stack
 
@@ -85,6 +86,10 @@ All settings are optional and controlled via environment variables. See [`.env.e
 | `APP_TIMEZONE` | `Europe/Madrid` | IANA timezone for timestamps |
 | `FLASK_DEBUG` | `0` | Debug mode (`1` for development, `0` for production) |
 | `PORT` | `5000` | Port the app listens on |
+| `LOG_LEVEL` | `INFO` | Application log level (`DEBUG`, `INFO`, `WARNING`, ...) |
+| `MAX_CONTENT_LENGTH` | `262144` | Maximum accepted request size in bytes |
+
+`.env` files are loaded automatically at startup when present, so the documented local workflow now matches the application behavior.
 
 ### Deploying to Azure
 
@@ -108,6 +113,7 @@ This app is designed to deploy cleanly on Microsoft Azure. The Dockerfile is com
 4. Configure environment variables in the Azure Portal → **Configuration** → **Application settings**:
    - `DATABASE_PATH` → `/home/data/database.db` (use Azure Files mount for persistence)
    - `APP_TIMEZONE` → your timezone
+   - `LOG_LEVEL` → `INFO`
    - `PORT` → `5000`
 
 #### Azure Container Apps
@@ -119,7 +125,7 @@ az containerapp create \
   --image <your-registry>.azurecr.io/truck-control:latest \
   --target-port 5000 \
   --ingress external \
-  --env-vars DATABASE_PATH=/data/database.db APP_TIMEZONE=Europe/Madrid
+  --env-vars DATABASE_PATH=/data/database.db APP_TIMEZONE=Europe/Madrid LOG_LEVEL=INFO
 ```
 
 #### Optional Azure integrations
@@ -127,6 +133,24 @@ az containerapp create \
 - **Azure SQL Database**: replace SQLite with Azure SQL by swapping the `sqlite3` connection for `pyodbc` or `SQLAlchemy`. The schema is simple (single table).
 - **Microsoft Entra ID**: add authentication via `MSAL` (Microsoft Authentication Library) and protect routes with `@login_required`.
 - **Application Insights**: add the OpenTelemetry-based App Insights instrumentation package (`opentelemetry-instrumentation-flask`) for request telemetry, logging, and error tracking.
+
+### MVP Azure Posture
+
+For a defendable Azure MVP without a major rewrite, this repository now assumes the following baseline posture:
+
+- Containerized deployment on **Azure App Service for Containers** or **Azure Container Apps**
+- Configuration via App Settings / environment variables, with local `.env` support only for development
+- **SQLite persisted on a mounted volume** for pilot scope or single-site usage
+- Non-root container, debug disabled in production, and conservative response headers
+- `/health` endpoint usable by Docker, Azure probes, or external monitors
+- Structured stdout logging ready for Azure log streaming
+
+Recommended next hardening steps after MVP:
+
+- Restrict ingress to trusted corporate IPs or front the app with Azure Application Gateway / WAF
+- Add Microsoft Entra ID or Azure Easy Auth before exposing the app broadly
+- Move from SQLite to Azure SQL if concurrent usage or multi-site scope increases
+- Add Application Insights for telemetry and alerting
 
 ### Project Structure
 
@@ -159,12 +183,15 @@ Detailed documentation is available in the [`docs/`](docs/) folder (in Spanish):
 
 - [Visión General](docs/general/vision_general.md)
 - [Arquitectura](docs/arquitectura/arquitectura.md)
+- [Arquitectura Azure MVP](docs/arquitectura/azure_mvp.md)
+- [Diagrama Azure MVP](docs/arquitectura/azure_mvp_diagrama.md)
 - [Instalación](docs/instalacion/instalacion.md)
 - [Despliegue](docs/despliegue/despliegue.md)
 - [API y Endpoints](docs/api/api.md)
 - [Base de Datos](docs/base_datos/base_datos.md)
 - [Guía de Usuario](docs/guia_usuario/guia_usuario.md)
 - [Mantenimiento](docs/mantenimiento/mantenimiento.md)
+- [Diagram placeholders](docs/diagrams/README.md)
 
 ### Contributing
 
@@ -189,8 +216,9 @@ Truck Control Web App es una aplicación web desarrollada con Flask que permite 
 - Búsqueda por matrícula tractora, matrícula remolque, empresa o número de envío
 - Reportes por rango de fechas con exportación a CSV
 - Filtrado por almacén y tipo de operación (carga/descarga)
-- Zona horaria y ruta de base de datos configurables mediante variables de entorno
-- Listo para Docker con usuario no-root y health check
+- Carga explícita de `.env` y configuración por variables de entorno
+- Endpoint real `/health`, cabeceras de seguridad básicas y logging de arranque
+- Listo para Docker con usuario no-root
 
 ### Tecnologías
 
@@ -255,6 +283,10 @@ Todos los ajustes son opcionales y se controlan mediante variables de entorno. V
 | `APP_TIMEZONE` | `Europe/Madrid` | Zona horaria IANA para los registros |
 | `FLASK_DEBUG` | `0` | Modo debug (`1` para desarrollo, `0` para producción) |
 | `PORT` | `5000` | Puerto de escucha de la aplicación |
+| `LOG_LEVEL` | `INFO` | Nivel de log de la aplicación |
+| `MAX_CONTENT_LENGTH` | `262144` | Tamaño máximo aceptado por petición en bytes |
+
+Si existe un archivo `.env`, la aplicación lo carga automáticamente al arrancar.
 
 ### Despliegue en Azure
 
@@ -278,6 +310,7 @@ Esta aplicación está diseñada para desplegarse de forma limpia en Microsoft A
 4. Configurar variables de entorno en el Portal de Azure → **Configuration** → **Application settings**:
    - `DATABASE_PATH` → `/home/data/database.db` (usar montaje de Azure Files para persistencia)
    - `APP_TIMEZONE` → tu zona horaria
+   - `LOG_LEVEL` → `INFO`
    - `PORT` → `5000`
 
 #### Azure Container Apps
@@ -289,7 +322,7 @@ az containerapp create \
   --image <your-registry>.azurecr.io/truck-control:latest \
   --target-port 5000 \
   --ingress external \
-  --env-vars DATABASE_PATH=/data/database.db APP_TIMEZONE=Europe/Madrid
+  --env-vars DATABASE_PATH=/data/database.db APP_TIMEZONE=Europe/Madrid LOG_LEVEL=INFO
 ```
 
 #### Integraciones opcionales de Azure
@@ -297,6 +330,24 @@ az containerapp create \
 - **Azure SQL Database**: reemplazar SQLite con Azure SQL cambiando la conexión `sqlite3` por `pyodbc` o `SQLAlchemy`. El esquema es simple (una sola tabla).
 - **Microsoft Entra ID**: añadir autenticación mediante `MSAL` (Microsoft Authentication Library) y proteger rutas con `@login_required`.
 - **Application Insights**: añadir el paquete de instrumentación basado en OpenTelemetry (`opentelemetry-instrumentation-flask`) para telemetría de peticiones, logs y seguimiento de errores.
+
+### Postura Azure para MVP
+
+Para defender este repositorio como MVP en Azure sin reescribirlo, la base propuesta es:
+
+- Despliegue contenedorizado en **Azure App Service for Containers** o **Azure Container Apps**
+- Configuración por App Settings / variables de entorno, con `.env` solo para desarrollo local
+- **SQLite con volumen montado** para pilotos o una única instalación
+- Contenedor sin privilegios, `FLASK_DEBUG=0` en producción y cabeceras HTTP defensivas
+- Endpoint `/health` utilizable por Docker y por sondas de plataforma
+- Logs por stdout, listos para Azure Log Stream
+
+Siguientes pasos recomendados cuando el MVP se abra a más usuarios o sedes:
+
+- Restringir acceso por IP o colocar la app detrás de Application Gateway / WAF
+- Añadir Microsoft Entra ID o Easy Auth antes de exponerla de forma amplia
+- Migrar de SQLite a Azure SQL si crece la concurrencia o el alcance multi-sede
+- Añadir Application Insights para observabilidad completa
 
 ### Estructura del Proyecto
 
@@ -329,12 +380,14 @@ La documentación completa se encuentra en la carpeta [`docs/`](docs/):
 
 - [Visión General](docs/general/vision_general.md)
 - [Arquitectura](docs/arquitectura/arquitectura.md)
+- [Arquitectura Azure MVP](docs/arquitectura/azure_mvp.md)
 - [Instalación](docs/instalacion/instalacion.md)
 - [Despliegue](docs/despliegue/despliegue.md)
 - [API y Endpoints](docs/api/api.md)
 - [Base de Datos](docs/base_datos/base_datos.md)
 - [Guía de Usuario](docs/guia_usuario/guia_usuario.md)
 - [Mantenimiento](docs/mantenimiento/mantenimiento.md)
+- [Marcadores para diagramas](docs/diagrams/README.md)
 
 ### Contribuir
 

@@ -26,6 +26,8 @@ Para Windows, puede crear un script PowerShell o una tarea programada similar.
 
 Si ha configurado logs para la aplicación, implemente una política de rotación:
 
+En despliegues sencillos o en Azure, puede mantener los logs en salida estándar y controlar su verbosidad mediante `LOG_LEVEL=INFO`.
+
 ```bash
 # Ejemplo usando logrotate en Linux
 /ruta/a/logs/app.log {
@@ -196,7 +198,27 @@ Realice auditorías periódicas:
 
 1. Revise los logs en busca de actividad sospechosa
 2. Verifique los permisos de archivos y directorios
-3. Considere implementar herramientas de monitorización de seguridad
+3. Revise que la aplicación siga desplegada como usuario no-root
+4. Considere implementar herramientas de monitorización de seguridad
+
+### Health Check
+
+El endpoint `/health` permite verificar rápidamente si la aplicación y la base de datos siguen operativas:
+
+```bash
+curl http://localhost:5000/health
+```
+
+Si devuelve `503`, revise primero la ruta configurada en `DATABASE_PATH`, permisos del volumen y logs de arranque.
+
+### Recomendaciones de endurecimiento para MVP
+
+Sin acometer una integración completa con Entra ID, se recomienda al menos:
+
+1. Restringir el acceso por red o IP si el despliegue está en Azure.
+2. Mantener `FLASK_DEBUG=0` en producción.
+3. Revisar periódicamente el volumen donde persiste SQLite.
+4. Planificar la migración a Azure SQL y autenticación corporativa si el piloto escala.
 
 ## Mejoras Futuras
 

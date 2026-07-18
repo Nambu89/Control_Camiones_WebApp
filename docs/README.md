@@ -6,6 +6,8 @@ Este documento proporciona una visión general del Sistema de Control Logístico
 
 - [Visión General](./general/vision_general.md) - Descripción general del sistema y sus objetivos
 - [Arquitectura](./arquitectura/arquitectura.md) - Arquitectura técnica de la aplicación
+- [Arquitectura Azure MVP](./arquitectura/azure_mvp.md) - Postura recomendada para un despliegue defendible en Azure
+- [Diagrama Azure MVP](./arquitectura/azure_mvp_diagrama.md) - Vista textual/mermaid de la arquitectura objetivo para Azure
 - [Instalación](./instalacion/instalacion.md) - Guía de instalación y configuración
 - [Funcionalidades](./funcionalidades/funcionalidades.md) - Descripción detallada de las funcionalidades del sistema
 - [Base de Datos](./base_datos/base_datos.md) - Estructura y gestión de la base de datos
