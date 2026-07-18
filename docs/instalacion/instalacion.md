@@ -90,12 +90,19 @@ La aplicación estará disponible en `http://localhost:5000`.
 
 ### Zona Horaria
 
-La aplicación está configurada para utilizar la zona horaria de España (Europe/Madrid). Si necesita cambiar esto, modifique la constante `TIMEZONE` en el archivo `app.py`:
+La aplicación está configurada para utilizar la zona horaria de España (Europe/Madrid) por defecto. Puede cambiarla mediante la variable de entorno `APP_TIMEZONE`:
 
-```python
-# Configuración de zona horaria
-TIMEZONE = timezone('Europe/Madrid')  # Cambie a su zona horaria según sea necesario
+```bash
+# Linux/macOS
+export APP_TIMEZONE=America/Mexico_City
+python app.py
+
+# Windows PowerShell
+$env:APP_TIMEZONE="America/Mexico_City"
+python app.py
 ```
+
+O copiando `.env.example` a `.env` y ajustando el valor. Ver [lista de zonas horarias IANA](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 
 ### Personalización de Almacenes
 

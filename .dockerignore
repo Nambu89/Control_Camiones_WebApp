@@ -37,6 +37,11 @@ Thumbs.db
 Dockerfile
 .dockerignore
 
+# Environment files (never copy secrets into the image)
+.env
+.env.local
+.env.*.local
+
 # Otros
 *.swp
 *.swo

@@ -1,21 +1,25 @@
 from flask import Flask, render_template, request, redirect, url_for, Response
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 from pytz import timezone
 import csv
 from io import StringIO
 import os
-import shutil
-import time
-import logging
 
 app = Flask(__name__)
 
-# Configuración de zona horaria para España
-TIMEZONE = timezone('Europe/Madrid')
+# ---------------------------------------------------------------------------
+# Configuration — all values are overridable via environment variables.
+# Copy .env.example to .env and adjust as needed.
+# ---------------------------------------------------------------------------
+DATABASE_PATH = os.environ.get('DATABASE_PATH', 'database.db')
+TIMEZONE_NAME = os.environ.get('APP_TIMEZONE', 'Europe/Madrid')
+TIMEZONE = timezone(TIMEZONE_NAME)
+DEBUG = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
+PORT = int(os.environ.get('PORT', '5000'))
 
 def init_db():
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         c = conn.cursor()
         c.execute('''
             CREATE TABLE IF NOT EXISTS camiones(
@@ -48,16 +52,16 @@ def index():
         almacen = request.form.get('almacen')  # Nuevo campo
         tipo = request.form.get('tipo')  # Nuevo campo
 
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             c = conn.cursor()
-            c.execute('SELECT id, fecha_entrada, fecha_salida FROM camiones WHERE matricula_tractora = ? ORDER BY id DESC LIMIT 1', 
+            c.execute('SELECT id, fecha_entrada, fecha_salida FROM camiones WHERE matricula_tractora = ? ORDER BY id DESC LIMIT 1',
                      (matricula_tractora,))
             row = c.fetchone()
 
         if not row or (row and row[2] is not None):
             # Registrar entrada
             fecha_entrada = get_current_datetime()
-            with sqlite3.connect('database.db') as conn:
+            with sqlite3.connect(DATABASE_PATH) as conn:
                 c = conn.cursor()
                 c.execute('''
                     INSERT INTO camiones 
@@ -70,7 +74,7 @@ def index():
             # Registrar salida
             cam_id = row[0]
             fecha_salida = get_current_datetime()
-            with sqlite3.connect('database.db') as conn:
+            with sqlite3.connect(DATABASE_PATH) as conn:
                 c = conn.cursor()
                 c.execute('UPDATE camiones SET fecha_salida = ? WHERE id = ?', (fecha_salida, cam_id))
                 conn.commit()
@@ -88,7 +92,7 @@ def index():
     tipo = ''
 
     if matricula_tractora:
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             c = conn.cursor()
             c.execute('''
                 SELECT id, empresa, matricula_remolque, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
@@ -126,7 +130,7 @@ def index():
 def list_camiones():
     almacen_filter = request.args.get('almacen', '')
     
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         c = conn.cursor()
         
         if almacen_filter:
@@ -150,7 +154,7 @@ def list_camiones():
 def registrar_salida(camion_id):
     fecha_salida = get_current_datetime()
 
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         c = conn.cursor()
         # Primero obtenemos matricula_tractora y fecha_entrada de este camion_id
         c.execute('SELECT matricula_tractora, fecha_entrada FROM camiones WHERE id=?', (camion_id,))
@@ -174,7 +178,7 @@ def registrar_salida(camion_id):
 
 @app.route('/replicate/<int:camion_id>', methods=['POST'])
 def replicate_camion(camion_id):
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         c = conn.cursor()
         c.execute('''
             SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, numero_envio, almacen, tipo 
@@ -203,7 +207,7 @@ def replicate_camion(camion_id):
 
 @app.route('/delete/<int:camion_id>', methods=['POST'])
 def delete_camion(camion_id):
-    with sqlite3.connect('database.db') as conn:
+    with sqlite3.connect(DATABASE_PATH) as conn:
         c = conn.cursor()
         c.execute('DELETE FROM camiones WHERE id = ?', (camion_id,))
         conn.commit()
@@ -215,7 +219,7 @@ def search():
     query = ''
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             c = conn.cursor()
             c.execute("""
                 SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
@@ -247,7 +251,7 @@ def report():
             start_date_iso = convert_date_format(start_date)
             end_date_iso = convert_date_format(end_date)
 
-            with sqlite3.connect('database.db') as conn:
+            with sqlite3.connect(DATABASE_PATH) as conn:
                 c = conn.cursor()
                 c.execute('''
                     SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
@@ -273,7 +277,7 @@ def export_csv():
         start_date_iso = convert_date_format(start_date)
         end_date_iso = convert_date_format(end_date)
 
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             c = conn.cursor()
             c.execute('''
                 SELECT matricula_tractora, matricula_remolque, empresa, fecha_entrada, fecha_salida, numero_envio, almacen, tipo
@@ -310,7 +314,7 @@ def edit_camion(camion_id):
         almacen = request.form.get('almacen', '')
         tipo = request.form.get('tipo', '')
         
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             c = conn.cursor()
             c.execute('''
                 UPDATE camiones 
@@ -325,7 +329,7 @@ def edit_camion(camion_id):
             conn.commit()
         return redirect(url_for('list_camiones'))
     else:
-        with sqlite3.connect('database.db') as conn:
+        with sqlite3.connect(DATABASE_PATH) as conn:
             c = conn.cursor()
             c.execute('SELECT matricula_tractora, matricula_remolque, empresa, numero_envio, almacen, tipo FROM camiones WHERE id = ?', (camion_id,))
             row = c.fetchone()
@@ -344,4 +348,4 @@ def edit_camion(camion_id):
                              tipo=tipo)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=DEBUG, port=PORT)
