@@ -4,6 +4,10 @@ A lightweight web application for managing and monitoring truck entry and exit a
 
 > **Bilingual README** — [English](#english) | [Español](#español)
 
+## Azure MVP Architecture
+
+![Azure MVP Architecture](docs/diagrams/azure-mvp-architecture.jpg)
+
 ---
 
 ## English
